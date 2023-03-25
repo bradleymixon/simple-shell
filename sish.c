@@ -22,6 +22,25 @@ struct command_t{
     enum builtin_t builtin;
 };
 
+//HISTORY FUNCTIONALITY
+typedef struct{
+	char* cmd;
+} Command;
+
+Command history[100];// Array of Command structs with 100 spots
+int history_count = 0; //Count of how many entries are in history
+void add_to_history(char* cmd){
+	if(history_count == 100){ //check if histroy is currently full
+		free(history[0].cmd);
+		for(int i = 0; i < history_count; i++){
+			history[i] = history[i+i];
+		}
+		history_count--;
+	}
+	history[history_count].cmd = strdup(cmd);
+	history_count++;
+}
+
 
 int parse(const char *cmdline, struct command_t *cmd) {
     const char delim[10] = " \t\r\n";
@@ -81,26 +100,7 @@ int parse(const char *cmdline, struct command_t *cmd) {
    // free(line);
     return is_bg;
 }
-
-void runBuiltinCommand(struct command_t *cmd, int bg) {
-    switch(cmd->builtin) {
-        case EXIT:
-            exit(0);
-            break;
-        case CD:
-            //printf("sish: cd command not implemented yet\n");
-	    if(chdir(cmd->argv[1]) != 0)
-	    	perror("chdir() to failed");
-            break;
-        case HISTORY:
-            printf("sish: history command not implemented yet\n");
-            break;
-        default:
-            printf("sish: internal error\n");
-            break;
-    }
-}
-
+	
 void runSystemCommand(struct command_t *cmd, int bg) {
     pid_t childPid;
 
@@ -119,6 +119,49 @@ void runSystemCommand(struct command_t *cmd, int bg) {
     }
 }
 
+
+void runBuiltinCommand(struct command_t *cmd, int bg) {
+    switch(cmd->builtin) {
+        case EXIT:
+            exit(0);
+            break;
+        case CD:
+	    if(chdir(cmd->argv[1]) != 0)
+	    	perror("chdir() failed");
+            break;
+        case HISTORY:
+            if(cmd->argv[1] == NULL){
+	    	//printf("Command is history\n");
+		for(int i = 0; i < history_count; i++){
+			printf("%d %s\n", i, history[i].cmd);
+		}
+	    }
+	    else if(strcmp(cmd->argv[1], "-c") == 0){
+	    	//printf("Command is history -c\n");
+		for(int i = 0; i < history_count; i++){
+			free(history[i].cmd);
+		}
+		history_count = 0;
+	    } else {
+	    	//printf("Command is history [offset]\n");
+		int offset = atoi(cmd->argv[1]);
+		if(offset >= 0 && offset <= history_count){ //check if offset is valid
+			struct command_t history_cmd;
+			parse(history[offset].cmd, &history_cmd);
+			if (history_cmd.builtin != NONE) {
+    				runBuiltinCommand(&history_cmd, 0);
+			} else {
+    			runSystemCommand(&history_cmd, 0);
+			}	
+		}
+	    }
+	    break;
+        default:
+            printf("sish: internal error\n");
+            break;
+    }
+}
+
 int main() {
     char cmdline[MAXLINE];
     struct command_t cmd;
@@ -133,12 +176,20 @@ int main() {
 
         is_bg = parse(cmdline, &cmd);
 
+	char cmd_as_string[MAXLINE];
+	memset(cmd_as_string, '\0', sizeof(cmd_as_string));
+	for(int i = 0; i < cmd.argc; i++){
+		strcat(cmd_as_string, cmd.argv[i]);
+		strcat(cmd_as_string, " ");
+	}
+	add_to_history(cmd_as_string);
+
 	if(cmd.argc == 0){
 	}
         else if (cmd.builtin != NONE) {
-            runBuiltinCommand(&cmd, is_bg);
+	    runBuiltinCommand(&cmd, is_bg);
         } else {
-            runSystemCommand(&cmd, is_bg);
+	    runSystemCommand(&cmd, is_bg);
         }
     }
 
