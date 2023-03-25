@@ -1,77 +1,146 @@
 //Bradley Mixon
 //CS3377.505 Project 1
-// 3/24/23
+//3-25-23
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
-/*
- This program acts as a simple shell that is capable of handling exit, cd, history
- as well as piped commands.
- Terminates when user enters the 'exit' command
- */
+#define MAXARGS 128
+
+int MAXLINE = 1024;
+
+enum builtin_t {
+    NONE, EXIT, CD, HISTORY
+};
+
+struct command_t{
+    int argc;
+    char *argv[MAXARGS];
+    enum builtin_t builtin;
+};
 
 
-int main(int argc, char *argv[])
-{
+int parse(const char *cmdline, struct command_t *cmd) {
+    const char delim[10] = " \t\r\n";
+    char *line;
+    char *token;
+    char *endline;
+    int is_bg;
 
-	//define the required variables
-	FILE *fp;
-	char *line = NULL;
-	size_t len = 0;
-	ssize_t read;
+    if(cmdline == NULL) {
+        perror("command line is NULL\n");
+        return -1;
+    }
 
-	char *argument, *command;
-	char *saveptr1;
-	//int change, j;
+    line = malloc(MAXLINE);
+    if(line == NULL){
+    	perror("malloc failed");
+	return -1;
+    }
 
-	char* delim1 = " ";
-	//char* delim2 = " ";
+    (void) strncpy(line, cmdline, MAXLINE);
+    endline = line + strlen(line);
 
-	fp = stdin;
+    cmd->argc = 0;
 
-	while (1) {
-		printf("sish> ");
-		//getline() to get the input string
-		read = getline(&line, &len, fp);			
-		if(read == -1) //error checking
-			break;									
-		line[strcspn(line, "\n")] = '\0';
+    while(line < endline) {
+        line += strspn(line, delim);
+        if(line >= endline)
+            break;
+        token = line + strcspn(line, delim);
+        *token = '\0';
 
-		command = strtok_r(line, delim1, &saveptr1);
-		if(command == NULL)
-			break;
-		if(strcmp(command, "exit") == 0) //if user enters "exit", exit program
-			exit(EXIT_SUCCESS);
-		else if(strcmp(command, "cd") == 0){ //ch [dir]
-			argument = strtok_r(line, delim1, &saveptr1); //How to get this to read the second word in the line????
-			argument = strtok_r(line, delim1, &saveptr1);
+        cmd->argv[cmd->argc++] = line;
 
-			//chdir(argument);
-			if(chdir(argument) != 0) //What are parameters and return value for chdir()???????
-				perror("cd failed");
-	        }
-		else if(strcmp(command, "history") == 0){ //need to implement data structure for recording history. Double sided stack????
-			argument = strtok_r(line, delim1, &saveptr1); //How to get this to read the second word in the line????
-			argument = strtok_r(line, delim1, &saveptr1);
+        if(cmd->argc >= MAXARGS-1)
+            break;
+        line = token + 1;
+    }
 
-			//if history reaches more than 100 entries, delete the oldest entry to make room for new ones
-			//history itself is a command and should appear in history
-			//invald commands entered by user should also appear in history
-			
-			//if no argument
-			for(int i = 0; i < 100; i++){
-			//print i + command
-			}
+    cmd->argv[cmd->argc] = NULL;
 
-			//if argument == "-c"
-			//clear the entire history
-			
-			//if argument == offset
-			//execute command at given offset
-			//print error if offset is invalid 
-		}
-	}//end while loop	
-}//end main
+    if(cmd->argc == 0)
+        return 1;
+
+    cmd->builtin = NONE;
+
+    if(strcmp(cmd->argv[0], "exit") == 0) {
+        cmd->builtin = EXIT;
+    } else if(strcmp(cmd->argv[0], "cd") == 0) {
+        cmd->builtin = CD;
+    } else if(strcmp(cmd->argv[0], "history") == 0) {
+        cmd->builtin = HISTORY;
+    }
+
+    if((is_bg = (*cmd->argv[cmd->argc-1] == '&')) != 0)
+        cmd->argv[--cmd->argc] = NULL;
+
+   // free(line);
+    return is_bg;
+}
+
+void runBuiltinCommand(struct command_t *cmd, int bg) {
+    switch(cmd->builtin) {
+        case EXIT:
+            exit(0);
+            break;
+        case CD:
+            //printf("sish: cd command not implemented yet\n");
+	    if(chdir(cmd->argv[1]) != 0)
+	    	perror("chdir() to failed");
+            break;
+        case HISTORY:
+            printf("sish: history command not implemented yet\n");
+            break;
+        default:
+            printf("sish: internal error\n");
+            break;
+    }
+}
+
+void runSystemCommand(struct command_t *cmd, int bg) {
+    pid_t childPid;
+
+    if((childPid = fork()) < 0)
+        perror("fork() error");
+    else if(childPid == 0) {
+        if(execvp(cmd->argv[0], cmd->argv) < 0) {
+            printf("%s: Command not found\n", cmd->argv[0]);
+            exit(0);
+        }
+    } else { //parent
+        if(bg)
+            printf("Child process in background [%d]\n", childPid);
+        else
+            wait(NULL);
+    }
+}
+
+int main() {
+    char cmdline[MAXLINE];
+    struct command_t cmd;
+    int is_bg;
+
+    while(1) {
+        printf("sish> ");
+        fflush(stdout);
+
+        if(fgets(cmdline, MAXLINE, stdin) == NULL)
+            exit(0);
+
+        is_bg = parse(cmdline, &cmd);
+
+	if(cmd.argc == 0){
+	}
+        else if (cmd.builtin != NONE) {
+            runBuiltinCommand(&cmd, is_bg);
+        } else {
+            runSystemCommand(&cmd, is_bg);
+        }
+    }
+
+    return 0;
+}
