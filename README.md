@@ -28,3 +28,6 @@ an offset next to each command. The offset is the index of the command in the li
 - Augment your shell to be capable of executing a sequence of programs that communicate through a pipe. For example, if the user enters ls | wc, your program should fork the two programs, which together will calculate the number of files in the directory. For this you will need to replace stdin and stdout with pipe file descriptors using dup2.
 - While this example shows two processes communicating through a pipe, your shell should support pipes between multiple processes, not just two.
 - You need not support built-in commands to work with pipes.
+
+## References
+- [EnthusiastiCon - Stefanie Schirmer](https://www.youtube.com/watch?v=k6TTj4C0LF0)
