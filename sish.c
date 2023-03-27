@@ -31,10 +31,11 @@ Command history[100];// Array of Command structs with 100 spots
 int history_count = 0; //Count of how many entries are in history
 void add_to_history(char* cmd){
 	if(history_count == 100){ //check if histroy is currently full
-		free(history[0].cmd);
-		for(int i = 0; i < history_count; i++){
-			history[i] = history[i+i];
+		//free(history[0].cmd);
+		for(int i = 1; i < 100; i++){
+			history[i-1] = history[i];
 		}
+		//memmove(history, history+1, (history_count-1)*sizeof(Command));
 		history_count--;
 	}
 	history[history_count].cmd = strdup(cmd);
@@ -182,15 +183,19 @@ int main() {
 		strcat(cmd_as_string, cmd.argv[i]);
 		strcat(cmd_as_string, " ");
 	}
-	add_to_history(cmd_as_string);
+	//add_to_history(cmd_as_string); <-- This was causing an issue when testing hist100 because the command at index 1 was replaced
+	//					before history 1 was executed
 
 	if(cmd.argc == 0){
+	//printf("\n");
 	}
         else if (cmd.builtin != NONE) {
 	    runBuiltinCommand(&cmd, is_bg);
-        } else {
+       	    add_to_history(cmd_as_string); //command needed to be added to history AFTER execution
+       } else {
 	    runSystemCommand(&cmd, is_bg);
-        }
+            add_to_history(cmd_as_string); //command needed to be added to history AFTER execution
+	}
     }
 
     return 0;
