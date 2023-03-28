@@ -3,6 +3,9 @@ CS/SE 3377 Sys. Prog. in Unix and Other Envs. Project 1
 
 In this project, you will implement a command line interpreter or shell. The shell should operate in this basic way: when you type in a command (in response to its prompt), the shell creates a child process that executes the command you entered and then prompts for more user input when it has finished.
 
+Note: sish.c is compiled as follows:
+gcc sish.c –o sish -Wall -Werror -std=gnu99
+
 ## Part 1 - The Simple Shell
 - Shell executable must be named **sish**. Source code must be in file **sish.c**
 - Shell should run continuously and display a prompt when waiting for input. The prompt should be EXACTLY **sish>** . (Space after >)
